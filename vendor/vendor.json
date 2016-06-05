@@ -1,0 +1,16 @@
+{
+	"comment": "",
+	"ignore": "",
+	"package": [
+		{
+			"path": "github.com/cihub/seelog",
+			"revision": "57ee49ef3647bed2ccc65be013985a65bf3f1458",
+			"revisionTime": "2016-06-01T22:38:43+03:00"
+		},
+		{
+			"path": "github.com/vrecan/death",
+			"revision": "5a0fa1df47a03b40810f87858594fd4d13e1a794",
+			"revisionTime": "2016-03-05T13:18:13-07:00"
+		}
+	]
+}
