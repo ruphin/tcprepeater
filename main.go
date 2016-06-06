@@ -4,15 +4,11 @@ import "net"
 import "fmt"
 import "log"
 import "io"
-import DEATH "github.com/vrecan/death"
-import SYS "syscall"
-
-var death *DEATH.Death
-var connections []io.Closer
+import "bufio"
+import "time"
 
 func startTestListener() {
 	test, err := net.Listen("tcp", "localhost:4001")
-	connections = append(connections, test)
 	if err != nil {
 		log.Fatal(err)
 		panic(err)
@@ -26,23 +22,19 @@ func startTestListener() {
 			log.Fatal(err)
 			panic(err)
 		}
-		connections = append(connections, conn)
 		// Handle the connection in a new goroutine.
 		// The loop then returns to accepting, so that
 		// multiple connections may be served concurrently.
 		go func(c net.Conn, num int) {
-			fmt.Println(num, " Starting")
-			buf := make([]byte, 0, 4096)
-			n := 0
+			fmt.Println(num, "Starting")
+			var status string
+			var err error
+			r := bufio.NewReader(c)
 			for {
-				n += 1
-				_, err := c.Read(buf)
+				status, err = r.ReadString('\n')
+				fmt.Print(num, status)
 				if err != nil && err != io.EOF {
-					fmt.Println(num, " Something bad ", err)
-					break
-				}
-				fmt.Println(num, " Read:", buf)
-				if n == 10 {
+					fmt.Println(num, "Something bad", err)
 					break
 				}
 			}
@@ -72,20 +64,33 @@ func send(buf []byte) {
 	}
 }
 
-func main() {
-	death = DEATH.NewDeath(SYS.SIGINT, SYS.SIGTERM)
-	connections = make([]io.Closer, 0)
+func relay(msg string) {
+	var err error
+	_, err = fmt.Fprintf(a, msg)
+	if err != nil {
+		log.Fatal(err)
+		panic(err)
+	}
+	_, err = fmt.Fprintf(b, msg)
+	if err != nil {
+		log.Fatal(err)
+		panic(err)
+	}
+	_, err = fmt.Fprintf(c, msg)
+	if err != nil {
+		log.Fatal(err)
+		panic(err)
+	}
+}
 
-	go startTestListener()
+func runRelay() {
 	var err error
 	a, err = net.Dial("tcp", "localhost:4001")
-	fmt.Println("Test1")
 	if err != nil {
 		log.Fatal(err)
 		panic(err)
 	}
 	b, err = net.Dial("tcp", "localhost:4001")
-	fmt.Println("Test2")
 	if err != nil {
 		log.Fatal(err)
 		panic(err)
@@ -96,19 +101,10 @@ func main() {
 		panic(err)
 	}
 
-	connections = append(connections, a)
-	connections = append(connections, b)
-	connections = append(connections, c)
-
 	source, err := net.Listen("tcp", "localhost:4000")
 	if err != nil {
 		panic(err)
 	}
-	connections = append(connections, source)
-
-	go func() {
-		death.WaitForDeath(connections...)
-	}()
 
 	for {
 		conn, err := source.Accept()
@@ -116,24 +112,36 @@ func main() {
 			log.Fatal(err)
 			panic(err)
 		}
-		connections = append(connections, conn)
 		go func(c net.Conn) {
-			buf := make([]byte, 0, 4096)
-			n := 0
+			var msg string
+			var err error
+			r := bufio.NewReader(c)
 			for {
-				_, err := c.Read(buf)
-				n += 1
-				if err != nil && err != io.EOF {
-					fmt.Println("Something bad:", err)
-					break
-				}
-				send(buf)
-				if n == 10 {
+				msg, err = r.ReadString('\n')
+				fmt.Print("Get:", msg)
+				relay(msg)
+				if err != nil {
+					fmt.Println("Something bad", err)
 					break
 				}
 			}
 			c.Close()
 		}(conn)
 	}
+}
+
+func main() {
+
+	go startTestListener()
+	go runRelay()
+	
+	time.Sleep(time.Second * 1)
+	test, err := net.Dial("tcp", "localhost:4000")
+	if err != nil {
+		log.Fatal(err)
+		panic(err)
+	}
+	fmt.Fprintf(test, "THIS IS A TEST\n")
+	time.Sleep(time.Second * 1)
 
 }
